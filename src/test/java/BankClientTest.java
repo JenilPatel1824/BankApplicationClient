@@ -1,0 +1,103 @@
+import org.junit.jupiter.api.Test;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.net.Socket;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import static org.junit.jupiter.api.Assertions.*;
+
+public class BankClientTest
+{
+
+    private static final int NUM_CONNECTIONS = 10000;
+
+    private static final long USER_ID = 1L;
+
+    private static final long ACCOUNT_NUMBER = 101L;
+
+    private static final long DEPOSIT_AMOUNT = 100L;
+
+    CountDownLatch latch = new CountDownLatch(NUM_CONNECTIONS);
+
+    @Test
+    void testMultipleDeposits() throws InterruptedException
+    {
+        ExecutorService executor = Executors.newFixedThreadPool(10000);
+
+        for (int i = 0; i < NUM_CONNECTIONS; i++)
+        {
+            executor.execute(() -> {
+                try (Socket socket = new Socket("localhost", 9999);
+                     ObjectOutputStream output = new ObjectOutputStream(socket.getOutputStream());
+                     ObjectInputStream input = new ObjectInputStream(socket.getInputStream()))
+                {
+                    Map<String, Object> request = new HashMap<>();
+
+                    request.put("command", "DEPOSIT");
+
+                    request.put("userId", USER_ID);
+
+                    request.put("accountNumber", ACCOUNT_NUMBER);
+
+                    request.put("amount", DEPOSIT_AMOUNT);
+
+                    output.writeObject(request);
+
+                    output.flush();
+
+                    Map<String, Object> response = (Map<String, Object>) input.readObject();
+
+                    assertNotNull(response, "Response should not be null");
+
+                }
+                catch (Exception e)
+                {
+                    fail("Client connection failed: " + e.getMessage());
+                }
+                finally
+                {
+                    latch.countDown();
+                }
+            });
+        }
+
+        latch.await();
+
+        try (Socket socket = new Socket("localhost", 9999);
+             ObjectOutputStream output = new ObjectOutputStream(socket.getOutputStream());
+             ObjectInputStream input = new ObjectInputStream(socket.getInputStream()))
+        {
+            Map<String, Object> balanceRequest = new HashMap<>();
+
+            balanceRequest.put("command", "CHECK");
+
+            balanceRequest.put("userId", USER_ID);
+
+            balanceRequest.put("accountNumber", ACCOUNT_NUMBER);
+
+            output.writeObject(balanceRequest);
+
+            output.flush();
+
+            Map<String, Object> balanceResponse = (Map<String, Object>) input.readObject();
+
+            assertNotNull(balanceResponse, "Balance response should not be null");
+
+            long balance = (long) balanceResponse.get("balance");
+
+            assertEquals(1000100, balance, "Final balance should be the expected value after all deposits");
+        }
+        catch (Exception e)
+        {
+            fail("Balance check failed: " + e.getMessage());
+        }
+
+        executor.shutdown();
+
+        assertTrue(executor.awaitTermination(30, TimeUnit.SECONDS), "Test should complete in 30 seconds");
+    }
+}
