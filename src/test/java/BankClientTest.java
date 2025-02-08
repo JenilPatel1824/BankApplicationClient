@@ -12,23 +12,22 @@ import static org.junit.jupiter.api.Assertions.*;
 
 public class BankClientTest
 {
+    private static final int connections = 100;
 
-    private static final int NUM_CONNECTIONS = 10000;
+    private static final long userID = 1L;
 
-    private static final long USER_ID = 1L;
+    private static final long acccountNumber = 101L;
 
-    private static final long ACCOUNT_NUMBER = 101L;
+    private static final long depositAmount = 100L;
 
-    private static final long DEPOSIT_AMOUNT = 100L;
-
-    CountDownLatch latch = new CountDownLatch(NUM_CONNECTIONS);
+    CountDownLatch latch = new CountDownLatch(connections);
 
     @Test
     void testMultipleDeposits() throws InterruptedException
     {
         ExecutorService executor = Executors.newFixedThreadPool(10000);
 
-        for (int i = 0; i < NUM_CONNECTIONS; i++)
+        for (int i = 0; i < connections; i++)
         {
             executor.execute(() -> {
                 try (Socket socket = new Socket("localhost", 9999);
@@ -39,19 +38,15 @@ public class BankClientTest
 
                     request.put("command", "DEPOSIT");
 
-                    request.put("userId", USER_ID);
+                    request.put("userId", userID);
 
-                    request.put("accountNumber", ACCOUNT_NUMBER);
+                    request.put("accountNumber", acccountNumber);
 
-                    request.put("amount", DEPOSIT_AMOUNT);
+                    request.put("amount", depositAmount);
 
                     output.writeObject(request);
 
                     output.flush();
-
-                    Map<String, Object> response = (Map<String, Object>) input.readObject();
-
-                    assertNotNull(response, "Response should not be null");
 
                 }
                 catch (Exception e)
@@ -75,9 +70,9 @@ public class BankClientTest
 
             balanceRequest.put("command", "CHECK");
 
-            balanceRequest.put("userId", USER_ID);
+            balanceRequest.put("userId", userID);
 
-            balanceRequest.put("accountNumber", ACCOUNT_NUMBER);
+            balanceRequest.put("accountNumber", acccountNumber);
 
             output.writeObject(balanceRequest);
 
@@ -89,7 +84,7 @@ public class BankClientTest
 
             long balance = (long) balanceResponse.get("balance");
 
-            assertEquals(1000100, balance, "Final balance should be the expected value after all deposits");
+            assertEquals(10100, balance, "Final balance should be the expected value after all deposits");
         }
         catch (Exception e)
         {

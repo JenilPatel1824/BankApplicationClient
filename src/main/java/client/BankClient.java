@@ -111,7 +111,18 @@ public class BankClient
                 }
                 logger.info("trying to connect bank server with: "+request);
 
-                Socket socket = new Socket("localhost", 9999);
+                Socket socket;
+
+                try
+                {
+                    socket = new Socket("localhost", 9999);
+                }
+                catch (ConnectException e)
+                {
+                    logger.error("Could not connect to server");
+
+                    continue;
+                }
 
                 logger.info("Connected to bank server");
 
@@ -141,7 +152,9 @@ public class BankClient
         }
         catch (Exception e)
         {
-            logger.error("Connection to server failed");
+            e.printStackTrace();
+
+            logger.error(e.getMessage());
         }
     }
 }
